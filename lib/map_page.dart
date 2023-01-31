@@ -11,6 +11,8 @@ import 'package:latlong2/latlong.dart';
 import 'package:self_test_map_tutorial/bloc/data_bloc.dart';
 import 'package:self_test_map_tutorial/widgets/count_down_tile.dart';
 
+import 'widgets/mark_popup_dialog.dart';
+
 class MapPage extends StatefulWidget {
   const MapPage({super.key});
 
@@ -22,6 +24,7 @@ class _MapPageState extends State<MapPage> {
   double _currentZoom = 15.0;
   final _bloc = DataBloc();
   final _mapController = MapController();
+  final _popupController = PopupController();
   int _countDown = 120;
   final StreamController<int> _countDownStreamController =
       StreamController<int>();
@@ -131,6 +134,7 @@ class _MapPageState extends State<MapPage> {
                 options: MapOptions(
                   center: snapshot.data,
                   zoom: _currentZoom,
+                  onTap: (_, __) => _popupController.hideAllPopups(),
                   onPositionChanged: (_, __) =>
                       _currentZoom = _mapController.zoom,
                 ),
@@ -158,6 +162,16 @@ class _MapPageState extends State<MapPage> {
                   TileLayer(
                       urlTemplate:
                           "https://tile.openstreetmap.org/{z}/{x}/{y}.png"),
+                  CurrentLocationLayer(
+                    positionStream: kIsWeb
+                        ? const LocationMarkerDataStreamFactory()
+                            .fromGeolocatorPositionStream(
+                                stream: Geolocator.getPositionStream(
+                                    locationSettings: const LocationSettings()))
+                        : null,
+                    style:
+                        const LocationMarkerStyle(showHeadingSector: !kIsWeb),
+                  ),
                   BlocBuilder<DataBloc, DataState>(
                       bloc: _bloc,
                       builder: (context, state) {
@@ -196,27 +210,28 @@ class _MapPageState extends State<MapPage> {
                                 ),
                               ),
                               popupOptions: PopupOptions(
-                                  popupAnimation: const PopupAnimation.fade(),
-                                  markerTapBehavior: MarkerTapBehavior
-                                      .togglePopupAndHideRest(),
-                                  popupBuilder: (context, marker) =>
-                                      const SizedBox(),
-                                  popupState: PopupState()),
+                                popupState: PopupState(),
+                                popupController: _popupController,
+                                popupAnimation: const PopupAnimation.fade(),
+                                markerTapBehavior:
+                                    MarkerTapBehavior.togglePopupAndHideRest(),
+                                popupBuilder: (context, marker) {
+                                  final seller = state.sellerList.firstWhere(
+                                      (element) =>
+                                          element.latLng == marker.point);
+                                  return SizedBox(
+                                    width: 208,
+                                    child: MarkerPopupDialog(
+                                      info: seller,
+                                    ),
+                                  );
+                                },
+                              ),
                             ),
                           );
                         }
                         return const SizedBox();
                       }),
-                  CurrentLocationLayer(
-                    positionStream: kIsWeb
-                        ? const LocationMarkerDataStreamFactory()
-                            .fromGeolocatorPositionStream(
-                                stream: Geolocator.getPositionStream(
-                                    locationSettings: const LocationSettings()))
-                        : null,
-                    style:
-                        const LocationMarkerStyle(showHeadingSector: !kIsWeb),
-                  ),
                 ],
               );
             }
